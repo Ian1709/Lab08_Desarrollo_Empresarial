@@ -1,0 +1,120 @@
+EVIDENCIAS — API NAVEGABLE DE DJANGO REST FRAMEWORK (paso 7)
+Servidor: py manage.py runserver 127.0.0.1:8000
+Datos: py manage.py seed_quiz --reset  (2 exámenes, 10 preguntas)
+Navegador: pestaña sobre http://127.0.0.1:8000/api/ (API navegable HTML)
+
+Preferencias de permiso de partida: AllowAny, por lo que la API navegable permite
+realizar altas, cambios y bajas sin iniciar sesión.
+
+==============================================================================
+1) LISTAR — GET http://127.0.0.1:8000/api/examenes/
+------------------------------------------------------------------------------
+GET /api/examenes/
+HTTP 200 OK
+Allow: GET, POST, HEAD, OPTIONS
+Content-Type: application/json
+
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 7,
+            "titulo": "Fundamentos de Python",
+            "descripcion": "Cuestionario de introducción al lenguaje Python.",
+            "activo": true,
+            "fecha_creacion": "2026-10-16T19:08:28.439795Z"
+        },
+        {
+            "id": 8,
+            "titulo": "Bases de datos",
+            "descripcion": "Cuestionario sobre SQL y modelado relacional.",
+            "activo": true,
+            "fecha_creacion": "2026-10-16T19:08:28.449480Z"
+        }
+    ]
+}
+
+La página muestra además el formulario HTML con los campos Título, Descripción y
+Activo, y el botón POST.  -> Código de estado: 200 OK
+
+
+==============================================================================
+2) CREAR — POST desde el formulario HTML de la lista
+------------------------------------------------------------------------------
+POST /api/examenes/
+HTTP 201 Created
+Allow: GET, POST, HEAD, OPTIONS
+Content-Type: application/json
+
+{
+    "id": 11,
+    "titulo": "Examen creado desde la API navegable",
+    "descripcion": "Alta desde el formulario HTML de la API navegable.",
+    "activo": true,
+    "fecha_creacion": "2026-10-16T19:09:54.082980Z"
+}
+
+-> Código de estado: 201 Created
+
+
+==============================================================================
+3) VER EL DETALLE — GET http://127.0.0.1:8000/api/examenes/11/
+------------------------------------------------------------------------------
+GET /api/examenes/11/
+HTTP 200 OK
+Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
+Content-Type: application/json
+
+{
+    "id": 11,
+    "titulo": "Examen creado desde la API navegable",
+    "descripcion": "Alta desde el formulario HTML de la API navegable.",
+    "activo": true,
+    "fecha_creacion": "2026-10-16T19:09:54.082980Z"
+}
+
+La página ofrece el formulario HTML (botón PUT), la pestaña "Raw data"
+(botones PUT y PATCH) y el botón DELETE.  -> Código de estado: 200 OK
+
+
+==============================================================================
+4) MODIFICAR PARCIALMENTE — PATCH desde la pestaña "Raw data"
+   Cuerpo enviado: {"descripcion": "Modificado parcialmente (PATCH) desde la API navegable."}
+------------------------------------------------------------------------------
+PATCH /api/examenes/11/
+HTTP 200 OK
+Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
+Content-Type: application/json
+
+{
+    "id": 11,
+    "titulo": "Examen creado desde la API navegable",
+    "descripcion": "Modificado parcialmente (PATCH) desde la API navegable.",
+    "activo": true,
+    "fecha_creacion": "2026-10-16T19:09:54.082980Z"
+}
+
+El título y el resto de campos se conservan.  -> Código de estado: 200 OK
+
+
+==============================================================================
+5) ELIMINAR — DELETE desde el detalle
+------------------------------------------------------------------------------
+DELETE /api/examenes/11/
+HTTP 204 No Content
+Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
+
+-> Código de estado: 204 No Content
+
+
+==============================================================================
+RESUMEN DE CÓDIGOS (API navegable)
+------------------------------------------------------------------------------
+Listar          GET     /api/examenes/        -> 200 OK
+Detalle         GET     /api/examenes/11/     -> 200 OK
+Crear           POST    /api/examenes/        -> 201 Created
+Modificar par.  PATCH   /api/examenes/11/     -> 200 OK
+Eliminar        DELETE  /api/examenes/11/     -> 204 No Content
+==============================================================================
