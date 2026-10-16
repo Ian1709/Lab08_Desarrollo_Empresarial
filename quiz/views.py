@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 
+from .filters import PreguntaFilter
 from .models import Examen, Opcion, Pregunta
 from .serializers import (
     ExamenSerializer,
@@ -16,10 +17,16 @@ class ExamenViewSet(viewsets.ModelViewSet):
 
 
 class PreguntaViewSet(viewsets.ModelViewSet):
-    """CRUD de preguntas: /api/preguntas/"""
+    """CRUD de preguntas: /api/preguntas/
+
+    Filtrado por examen (?examen=<id>) y búsqueda por enunciado
+    (?search=<texto>).
+    """
 
     queryset = Pregunta.objects.select_related('examen').prefetch_related('opciones')
     serializer_class = PreguntaSerializer
+    filterset_class = PreguntaFilter
+    search_fields = ['enunciado']
 
 
 class OpcionViewSet(viewsets.ModelViewSet):
