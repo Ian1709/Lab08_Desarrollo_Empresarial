@@ -5,10 +5,23 @@ from .models import Examen, Opcion, Pregunta
 
 
 class OpcionSerializer(serializers.ModelSerializer):
-    """Opción de respuesta.
+    """Opción de respuesta como recurso independiente (/api/opciones/).
 
-    Se anida dentro de la pregunta, por lo que se expone sin el campo
-    ``pregunta``: la relación la resuelve el serializador de la pregunta.
+    Incluye ``pregunta`` (referida por identificador) para poder crear y
+    editar opciones sueltas.
+    """
+
+    class Meta:
+        model = Opcion
+        fields = ['id', 'pregunta', 'texto', 'es_correcta']
+        read_only_fields = ['id']
+
+
+class OpcionAnidadaSerializer(serializers.ModelSerializer):
+    """Opción anidada dentro de una pregunta.
+
+    No expone ``pregunta``: la relación la fija el serializador de la
+    pregunta que la contiene.
     """
 
     class Meta:
@@ -25,7 +38,7 @@ class PreguntaSerializer(serializers.ModelSerializer):
     Las opciones viajan anidadas y son escribibles.
     """
 
-    opciones = OpcionSerializer(many=True)
+    opciones = OpcionAnidadaSerializer(many=True)
 
     class Meta:
         model = Pregunta
@@ -34,21 +47,23 @@ class PreguntaSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """No se acepta una pregunta sin exactamente una opción correcta."""
-        opciones = attrs.get('opciones')
-        if opciones is None and self.instance is not None:
-            # Actualización parcial sin tocar las opciones: se validan las
+        if 'opciones' in attrs:
+            correctas = sum(
+                1 for opcion in attrs['opciones'] if opcion.get('es_correcta')
+            )
+        elif self.instance is not None:
+            # Actualización parcial sin tocar las opciones: se cuentan las
             # que ya están guardadas.
-            opciones = list(self.instance.opciones.all())
+            correctas = self.instance.opciones.filter(es_correcta=True).count()
         else:
-            opciones = opciones or []
+            correctas = 0
 
-        correctas = [opcion for opcion in opciones if opcion.get('es_correcta')]
-        if len(correctas) != 1:
+        if correctas != 1:
             raise serializers.ValidationError(
                 {
                     'opciones': (
                         'La pregunta debe tener exactamente una opción '
-                        f'correcta (se recibieron {len(correctas)}).'
+                        f'correcta (se recibieron {correctas}).'
                     )
                 }
             )
