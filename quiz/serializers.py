@@ -32,6 +32,28 @@ class PreguntaSerializer(serializers.ModelSerializer):
         fields = ['id', 'examen', 'enunciado', 'orden', 'opciones']
         read_only_fields = ['id']
 
+    def validate(self, attrs):
+        """No se acepta una pregunta sin exactamente una opción correcta."""
+        opciones = attrs.get('opciones')
+        if opciones is None and self.instance is not None:
+            # Actualización parcial sin tocar las opciones: se validan las
+            # que ya están guardadas.
+            opciones = list(self.instance.opciones.all())
+        else:
+            opciones = opciones or []
+
+        correctas = [opcion for opcion in opciones if opcion.get('es_correcta')]
+        if len(correctas) != 1:
+            raise serializers.ValidationError(
+                {
+                    'opciones': (
+                        'La pregunta debe tener exactamente una opción '
+                        f'correcta (se recibieron {len(correctas)}).'
+                    )
+                }
+            )
+        return attrs
+
     @transaction.atomic
     def create(self, validated_data):
         opciones_data = validated_data.pop('opciones', [])
