@@ -138,9 +138,10 @@ REST_FRAMEWORK = {
     # Paginación por defecto: 5 elementos por página.
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 5,
-    # Clases de permiso de partida: lectura libre, escritura solo autenticada.
+    # Clases de permiso de partida: acceso abierto para la práctica.
+    # (En producción se endurecería, p. ej. IsAuthenticatedOrReadOnly.)
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.AllowAny',
     ],
     # Filtrado y búsqueda disponibles en todos los viewsets.
     'DEFAULT_FILTER_BACKENDS': [
