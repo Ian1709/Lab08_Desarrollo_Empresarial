@@ -1,21 +1,28 @@
 """Cliente HTTP externo para recorrer la API de cuestionarios.
 
 Realiza las mismas operaciones que la API navegable (listar, ver detalle,
-crear, modificar parcialmente, modificar y eliminar) y provoca tres errores
-a propósito, anotando el código de estado de cada respuesta.
+crear, modificar parcialmente, modificar y eliminar), provoca tres errores a
+propósito, y termina con el filtrado, la búsqueda y la paginación, anotando el
+código de estado de cada respuesta.
+
+La API exige token (Parte 3 del lab extra): exporta QUIZ_TOKEN con el token de
+la persona «profe» (lo imprime `py manage.py seed_quiz`).
 
 Uso:
+    $env:QUIZ_TOKEN = "..."     # PowerShell
     py scripts/demo_api.py
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 
 BASE = 'http://127.0.0.1:8000/api'
+TOKEN = ''  # lo fija main() a partir de QUIZ_TOKEN
 SALIDA = []
 TIMEOUT = 10
 
@@ -26,9 +33,12 @@ def log(texto: str = '') -> None:
 
 
 def peticion(metodo: str, ruta: str, cuerpo=None):
-    """Devuelve (codigo, texto_cuerpo). Envía y recibe JSON."""
+    """Devuelve (codigo, texto_cuerpo). Envía y recibe JSON, con token."""
     datos = None
-    cabeceras = {'Accept': 'application/json'}
+    cabeceras = {
+        'Accept': 'application/json',
+        'Authorization': f'Token {TOKEN}',
+    }
     if cuerpo is not None:
         datos = json.dumps(cuerpo).encode('utf-8')
         cabeceras['Content-Type'] = 'application/json'
@@ -58,6 +68,13 @@ def muestra(titulo: str, metodo: str, ruta: str, codigo: int, cuerpo: str) -> No
 
 
 def main() -> int:
+    global TOKEN
+    TOKEN = os.environ.get('QUIZ_TOKEN', '')
+    if not TOKEN:
+        print('Falta QUIZ_TOKEN. Ejecuta «py manage.py seed_quiz» y copia el token de la persona (profe):')
+        print('  PowerShell:  $env:QUIZ_TOKEN = "..."')
+        return 1
+
     # ---------------------------------------------------------------- listar
     codigo, cuerpo = peticion('GET', '/examenes/')
     muestra('PASO 7/8.1  Listar exámenes', 'GET', '/examenes/', codigo, cuerpo)

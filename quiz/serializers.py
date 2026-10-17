@@ -94,9 +94,17 @@ class PreguntaSerializer(serializers.ModelSerializer):
 
 class ExamenSerializer(serializers.ModelSerializer):
     """Examen. Las preguntas se consultan por su propio recurso
-    (``/api/preguntas/?examen=<id>``), no se anidan aquí."""
+    (``/api/preguntas/?examen=<id>``), no se anidan aquí.
+
+    ``question_count`` es de solo lectura: cuántas preguntas tiene el examen
+    AHORA. La pasarela del agente lo incluye en el plan destructivo, de modo
+    que si alguien añade o quita preguntas después de la aprobación, el hash
+    deja de coincidir y el plan muere.
+    """
+
+    question_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Examen
-        fields = ['id', 'titulo', 'descripcion', 'activo', 'fecha_creacion']
+        fields = ['id', 'titulo', 'descripcion', 'activo', 'fecha_creacion', 'question_count']
         read_only_fields = ['id', 'fecha_creacion']

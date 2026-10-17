@@ -1,9 +1,14 @@
-from django.urls import reverse
+"""Pruebas del Lab 8: serializadores y CRUD de la API.
+
+La API ahora exige token (Parte 3 del lab extra), así que las pruebas HTTP
+autentican con el token de la persona «profe».
+"""
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Examen, Opcion, Pregunta
-from .serializers import PreguntaSerializer
+from ..models import Examen, Opcion, Pregunta
+from ..serializers import PreguntaSerializer
+from .helpers import person_token
 
 
 class PreguntaSerializerTests(APITestCase):
@@ -54,6 +59,8 @@ class PreguntaSerializerTests(APITestCase):
 
 class ApiCrudTests(APITestCase):
     def setUp(self):
+        self.token = person_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token}')
         self.examen = Examen.objects.create(titulo='Examen API')
         self.pregunta = Pregunta.objects.create(
             examen=self.examen, enunciado='Pregunta base', orden=1,
@@ -87,3 +94,8 @@ class ApiCrudTests(APITestCase):
         respuesta = self.client.get(f'/api/preguntas/?examen={self.examen.id}')
         self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
         self.assertEqual(respuesta.data['count'], 1)
+
+    def test_sin_token_no_entra(self):
+        self.client.credentials()
+        respuesta = self.client.get('/api/examenes/')
+        self.assertEqual(respuesta.status_code, status.HTTP_401_UNAUTHORIZED)

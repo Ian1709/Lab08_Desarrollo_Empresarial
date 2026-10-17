@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Terceros
     'rest_framework',
+    'rest_framework.authtoken',
     'django_filters',
+    'drf_spectacular',
     # Aplicaciones del proyecto
     'quiz',
 ]
@@ -135,18 +137,40 @@ MAILERS = {
 # Django REST Framework
 # https://www.django-rest-framework.org/api-guide/settings/
 REST_FRAMEWORK = {
+    # Identidad por token en la cabecera Authorization (estilo headless). La
+    # autenticación por sesión se mantiene SOLO para poder usar la API navegable
+    # desde el navegador (inicio de sesión con formulario y CSRF).
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     # Paginación por defecto: 5 elementos por página.
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 5,
-    # Clases de permiso de partida: acceso abierto para la práctica.
-    # (En producción se endurecería, p. ej. IsAuthenticatedOrReadOnly.)
+    # Permisos de partida: hay que ser alguien (token) y el rol decide qué se
+    # puede hacer (ver quiz/permissions.py).
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
+        'quiz.permissions.AgentPermission',
     ],
+    # Contrato OpenAPI generado por drf-spectacular (Parte 1 del lab extra).
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     # Filtrado y búsqueda disponibles en todos los viewsets.
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+}
+
+# Contrato de la API (lo que leen el cliente de consola y la pasarela del agente)
+# https://drf-spectacular.readthedocs.io/en/latest/settings.html
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'API de cuestionarios',
+    'DESCRIPTION': (
+        'Contrato de la API del Lab 8: exámenes, preguntas y opciones. '
+        'Es lo que usan el cliente de consola (quizctl.py) y la pasarela del agente (agent/).'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }

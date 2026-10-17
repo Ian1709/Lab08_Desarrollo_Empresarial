@@ -1,6 +1,40 @@
+from django.contrib.auth.models import Group, User
 from django.core.management.base import BaseCommand
+from django.db import transaction
+from rest_framework.authtoken.models import Token
 
 from quiz.models import Examen, Opcion, Pregunta
+from quiz.permissions import AGENT_GROUP
+
+# Contraseña de aula de la persona «profe»: solo para entrar en la API navegable
+# desde el navegador. Cambiar en cualquier despliegue real.
+PROFE_PASSWORD = 'profe12345'
+
+
+def ensure_users():
+    """La persona (staff) y el agente (grupo «agente»), cada una con su token.
+
+    Idempotente: volver a ejecutar el seed conserva los mismos tokens, de modo
+    que las variables de entorno siguen siendo válidas.
+
+    La persona recibe además una contraseña de aula (solo para poder iniciar
+    sesión en la API navegable desde el navegador; en producción sería una
+    contraseña real o un token, nunca un valor fijo).
+    """
+    group, _ = Group.objects.get_or_create(name=AGENT_GROUP)
+    person, created = User.objects.get_or_create(username='profe', defaults={'is_staff': True})
+    if created:
+        person.set_password(PROFE_PASSWORD)
+        person.save()
+    agent, created = User.objects.get_or_create(username='agente')
+    if created:
+        agent.set_unusable_password()
+        agent.save()
+    agent.groups.add(group)
+    return (
+        Token.objects.get_or_create(user=person)[0].key,
+        Token.objects.get_or_create(user=agent)[0].key,
+    )
 
 
 class Command(BaseCommand):
@@ -13,6 +47,7 @@ class Command(BaseCommand):
             help='Borra los datos existentes antes de sembrar.',
         )
 
+    @transaction.atomic
     def handle(self, *args, **options):
         if options['reset']:
             Opcion.objects.all().delete()
@@ -62,7 +97,18 @@ class Command(BaseCommand):
                     )
                 total_preguntas += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Listo: {Examen.objects.count()} exámenes y '
-            f'{total_preguntas} preguntas sembradas.'
-        ))
+        human, agent = ensure_users()
+
+        if options['verbosity'] > 0:
+            self.stdout.write(self.style.SUCCESS(
+                f'Listo: {Examen.objects.count()} exámenes y '
+                f'{total_preguntas} preguntas sembradas.'
+            ))
+            self.stdout.write('\nTokens (solo para esta máquina; el de la persona es el que puede borrar):')
+            self.stdout.write('  PowerShell:')
+            self.stdout.write(f'    $env:QUIZ_TOKEN_HUMANO = "{human}"')
+            self.stdout.write(f'    $env:QUIZ_TOKEN_AGENTE = "{agent}"')
+            self.stdout.write('  Bash:')
+            self.stdout.write(f'    export QUIZ_TOKEN_HUMANO={human}')
+            self.stdout.write(f'    export QUIZ_TOKEN_AGENTE={agent}')
+            self.stdout.write(f'\nAPI navegable (navegador): usuario «profe», contraseña «{PROFE_PASSWORD}».')

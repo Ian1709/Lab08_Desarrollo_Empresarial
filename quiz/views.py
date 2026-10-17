@@ -1,3 +1,4 @@
+from django.db.models import Count
 from rest_framework import viewsets
 
 from .filters import PreguntaFilter
@@ -12,7 +13,8 @@ from .serializers import (
 class ExamenViewSet(viewsets.ModelViewSet):
     """CRUD de exámenes: /api/examenes/"""
 
-    queryset = Examen.objects.all()
+    # question_count alimenta el campo homónimo del serializador (solo lectura).
+    queryset = Examen.objects.annotate(question_count=Count('preguntas')).order_by('id')
     serializer_class = ExamenSerializer
 
 
