@@ -3,8 +3,9 @@
 
 - **Proyecto:** `Lab08_proyecto`
 - **Repositorio:** https://github.com/Ian1709/Lab08_Desarrollo_Empresarial
-- **Entorno:** Python 3.13.5 · Django 6.1.2 · djangorestframework 3.18.3 · django-filter 26.2
+- **Entorno:** Python 3.13 · Django 6.1.2 · djangorestframework 3.18.3 · django-filter 26.2 · drf-spectacular 0.30.0 · requests 2.34.2
 - **Evidencias:** carpeta [`evidencias/`](evidencias/)
+- **Lab extra headless:** ver [`HEADLESS.md`](HEADLESS.md) (contrato OpenAPI, cliente de consola, permisos por rol y frontera del agente)
 
 ---
 
@@ -13,21 +14,26 @@
 ```
 Lab08_proyecto/
 ├── config/                     # paquete de configuración
-│   ├── settings.py             # INSTALLED_APPS + bloque REST_FRAMEWORK
-│   └── urls.py                 # router de la API bajo /api/
+│   ├── settings.py             # INSTALLED_APPS + bloque REST_FRAMEWORK + SPECTACULAR_SETTINGS
+│   └── urls.py                 # router de la API bajo /api/ + contrato /api/schema/ y /api/docs/
 ├── quiz/                       # aplicación del cuestionario
 │   ├── models.py               # Examen, Pregunta, Opcion
 │   ├── serializers.py          # ModelSerializer de los tres recursos
 │   ├── filters.py              # filtro por examen
 │   ├── views.py                # ModelViewSet de los tres recursos
+│   ├── permissions.py          # regla de roles del lab extra (Parte 3)
+│   ├── seed_data.py            # texto hostil a propósito (Parte 4)
 │   ├── admin.py
-│   ├── tests.py                # 8 pruebas
+│   ├── tests/                  # pruebas del Lab 8 y de las 4 partes del lab extra
 │   ├── management/commands/seed_quiz.py
 │   └── migrations/0001_initial.py
+├── agent/                      # pasarela cerrada del agente (Parte 4 del lab extra)
+├── quizctl.py                  # cliente de consola (Parte 2 del lab extra)
 ├── scripts/demo_api.py         # cliente HTTP externo (pasos 7-10)
 ├── evidencias/
 │   ├── api_navegable.txt       # recorrido de la API navegable (paso 7)
 │   └── api_demo.txt            # salida del cliente HTTP externo (pasos 8-10)
+├── HEADLESS.md                 # entregable del lab extra (las 4 partes)
 ├── requirements.txt
 └── manage.py
 ```
@@ -36,14 +42,16 @@ Lab08_proyecto/
 
 ## 2. Paso 1 — djangorestframework declarado en INSTALLED_APPS
 
-Se instaló `djangorestframework` (y `django-filter`) y se declaró en
-`config/settings.py`:
+Se instaló `djangorestframework` (y `django-filter`, `drf-spectacular` y
+`requests` para el lab extra) y se declaró en `config/settings.py`:
 
 ```python
 INSTALLED_APPS = [
     ...
     'rest_framework',
+    'rest_framework.authtoken',
     'django_filters',
+    'drf_spectacular',
     'quiz',
 ]
 ```
@@ -54,6 +62,8 @@ INSTALLED_APPS = [
 Django==6.1.2
 djangorestframework==3.18.3
 django-filter==26.2
+drf-spectacular==0.30.0
+requests==2.34.2
 ```
 
 ---
@@ -62,11 +72,17 @@ django-filter==26.2
 
 ```python
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 5,
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
+        'quiz.permissions.AgentPermission',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -77,9 +93,16 @@ REST_FRAMEWORK = {
 
 - **Paginación por defecto:** `PageNumberPagination` con **5** elementos por
   página.
-- **Permisos de partida:** `AllowAny` (acceso abierto para poder recorrer toda
-  la API en la práctica; en producción se endurecería, por ejemplo, a
-  `IsAuthenticatedOrReadOnly`).
+- **Permisos de partida:** `IsAuthenticated` (hay que ser alguien) más la regla
+  de roles `AgentPermission` del lab extra (Parte 3): la persona puede todo, el
+  agente nunca borra, el resto solo lee. Sin token, **401**.
+- **Identidad:** token en la cabecera `Authorization` para los clientes de
+  programación; la sesión se conserva solo para usar la API navegable desde el
+  navegador (`/api-auth/login/`, usuario `profe`).
+
+> Nota: en el Lab 8 original el permiso de partida era `AllowAny`. El lab extra
+> lo endurece a petición del enunciado («permisos en el servidor»). El recorrido
+> del paso 7 se repite iniciando sesión como `profe`; los códigos no cambian.
 
 ---
 
@@ -87,10 +110,14 @@ REST_FRAMEWORK = {
 
 | Serializador | Modelo | Campos expuestos | Campos de solo lectura |
 | ------------ | ------ | ---------------- | ---------------------- |
-| `ExamenSerializer` | `Examen` | `id`, `titulo`, `descripcion`, `activo`, `fecha_creacion` | `id`, `fecha_creacion` |
+| `ExamenSerializer` | `Examen` | `id`, `titulo`, `descripcion`, `activo`, `fecha_creacion`, `question_count` | `id`, `fecha_creacion`, `question_count` |
 | `PreguntaSerializer` | `Pregunta` | `id`, `examen`, `enunciado`, `orden`, `opciones` | `id` |
 | `OpcionSerializer` | `Opcion` | `id`, `pregunta`, `texto`, `es_correcta` | `id` |
 | `OpcionAnidadaSerializer` | `Opcion` | `id`, `texto`, `es_correcta` | `id` |
+
+`question_count` (lab extra) cuenta las preguntas del examen con una anotación
+`Count('preguntas')` en la vista; lo usa la pasarela del agente para que un plan
+destructivo muere si el examen cambia tras la aprobación.
 
 ---
 
@@ -289,10 +316,11 @@ Base: `http://127.0.0.1:8000`  ·  `Content-Type: application/json`
 ### Cómo reproducir
 
 ```bash
-py -m pip install -r requirements.txt
-py manage.py migrate
-py manage.py seed_quiz --reset          # datos de ejemplo
-py manage.py runserver                  # http://127.0.0.1:8000/api/
-py scripts/demo_api.py                  # cliente HTTP externo (en otra consola)
-py manage.py test quiz                  # 8 pruebas
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_quiz --reset        # datos de ejemplo + tokens (imprime QUIZ_TOKEN_HUMANO/AGENTE)
+python manage.py runserver                # http://127.0.0.1:8000/api/
+$env:QUIZ_TOKEN = "..."                   # el token de la persona (profe)
+python scripts/demo_api.py                # cliente HTTP externo (en otra consola)
+python manage.py test                     # todas las pruebas (Lab 8 + lab extra)
 ```

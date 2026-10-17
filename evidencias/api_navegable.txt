@@ -1,15 +1,41 @@
 EVIDENCIAS — API NAVEGABLE DE DJANGO REST FRAMEWORK (paso 7)
 Servidor: py manage.py runserver 127.0.0.1:8000
-Datos: py manage.py seed_quiz --reset  (2 exámenes, 10 preguntas)
-Navegador: pestaña sobre http://127.0.0.1:8000/api/ (API navegable HTML)
+Datos:    py manage.py seed_quiz --reset   (imprime los tokens y la contraseña de aula)
+Navegador: pestaña sobre http://127.0.0.1:8000/api/
 
-Preferencias de permiso de partida: AllowAny, por lo que la API navegable permite
-realizar altas, cambios y bajas sin iniciar sesión.
+DESDE EL LAB EXTRA (Parte 3) LA API EXIGE IDENTIDAD:
+- Sin identidad, la API responde 401 (no 403): primero hay que ser alguien.
+- En el navegador se usa la autenticación por SESIÓN: entrar con el usuario
+  «profe» (contraseña de aula «profe12345») en http://127.0.0.1:8000/api-auth/login/.
+  Ese usuario es staff, así que la persona puede todo (crear, modificar y borrar).
+- Los clientes de programación (quizctl.py, scripts/demo_api.py, agent/) usan
+  TOKEN en la cabecera Authorization, no la sesión.
+
+Los códigos de cada operación son los mismos que en el Laboratorio 8; solo cambia
+el paso previo de identificarse.
+
+==============================================================================
+0) SIN IDENTIDAD — GET http://127.0.0.1:8000/api/examenes/
+------------------------------------------------------------------------------
+GET /api/examenes/
+HTTP 401 Unauthorized
+Content-Type: application/json
+
+{"detail":"Authentication credentials were not provided."}
+
+-> Código de estado: 401 Unauthorized
+
+==============================================================================
+0b) INICIO DE SESIÓN — GET y POST http://127.0.0.1:8000/api-auth/login/
+------------------------------------------------------------------------------
+GET  /api-auth/login/   -> 200 OK   (formulario con el campo CSRF)
+POST /api-auth/login/   -> 200 OK   (tras iniciar sesión redirige a /api/)
+Usuario: profe   Contraseña: profe12345   -> Código de estado: 200 OK
 
 ==============================================================================
 1) LISTAR — GET http://127.0.0.1:8000/api/examenes/
 ------------------------------------------------------------------------------
-GET /api/examenes/
+GET /api/examenes/          (con la sesión de «profe»)
 HTTP 200 OK
 Allow: GET, POST, HEAD, OPTIONS
 Content-Type: application/json
@@ -20,18 +46,20 @@ Content-Type: application/json
     "previous": null,
     "results": [
         {
-            "id": 7,
+            "id": 4,
             "titulo": "Fundamentos de Python",
             "descripcion": "Cuestionario de introducción al lenguaje Python.",
             "activo": true,
-            "fecha_creacion": "2026-10-16T19:08:28.439795Z"
+            "fecha_creacion": "2026-10-17T04:42:17.771673Z",
+            "question_count": 7
         },
         {
-            "id": 8,
+            "id": 5,
             "titulo": "Bases de datos",
             "descripcion": "Cuestionario sobre SQL y modelado relacional.",
             "activo": true,
-            "fecha_creacion": "2026-10-16T19:08:28.449480Z"
+            "fecha_creacion": "2026-10-17T04:42:17.771937Z",
+            "question_count": 3
         }
     ]
 }
@@ -39,6 +67,9 @@ Content-Type: application/json
 La página muestra además el formulario HTML con los campos Título, Descripción y
 Activo, y el botón POST.  -> Código de estado: 200 OK
 
+Nota (lab extra): el examen expone question_count, de solo lectura. Lo usa la
+pasarela del agente para que un plan destructivo muera si el examen cambia
+después de la aprobación.
 
 ==============================================================================
 2) CREAR — POST desde el formulario HTML de la lista
@@ -49,72 +80,85 @@ Allow: GET, POST, HEAD, OPTIONS
 Content-Type: application/json
 
 {
-    "id": 11,
+    "id": 8,
     "titulo": "Examen creado desde la API navegable",
     "descripcion": "Alta desde el formulario HTML de la API navegable.",
     "activo": true,
-    "fecha_creacion": "2026-10-16T19:09:54.082980Z"
+    "fecha_creacion": "2026-10-17T05:02:11.412980Z",
+    "question_count": 0
 }
 
 -> Código de estado: 201 Created
 
-
 ==============================================================================
-3) VER EL DETALLE — GET http://127.0.0.1:8000/api/examenes/11/
+3) VER EL DETALLE — GET http://127.0.0.1:8000/api/examenes/8/
 ------------------------------------------------------------------------------
-GET /api/examenes/11/
+GET /api/examenes/8/
 HTTP 200 OK
 Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
 Content-Type: application/json
 
 {
-    "id": 11,
+    "id": 8,
     "titulo": "Examen creado desde la API navegable",
     "descripcion": "Alta desde el formulario HTML de la API navegable.",
     "activo": true,
-    "fecha_creacion": "2026-10-16T19:09:54.082980Z"
+    "fecha_creacion": "2026-10-17T05:02:11.412980Z",
+    "question_count": 0
 }
 
 La página ofrece el formulario HTML (botón PUT), la pestaña "Raw data"
 (botones PUT y PATCH) y el botón DELETE.  -> Código de estado: 200 OK
 
-
 ==============================================================================
 4) MODIFICAR PARCIALMENTE — PATCH desde la pestaña "Raw data"
    Cuerpo enviado: {"descripcion": "Modificado parcialmente (PATCH) desde la API navegable."}
 ------------------------------------------------------------------------------
-PATCH /api/examenes/11/
+PATCH /api/examenes/8/
 HTTP 200 OK
 Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
 Content-Type: application/json
 
 {
-    "id": 11,
+    "id": 8,
     "titulo": "Examen creado desde la API navegable",
     "descripcion": "Modificado parcialmente (PATCH) desde la API navegable.",
     "activo": true,
-    "fecha_creacion": "2026-10-16T19:09:54.082980Z"
+    "fecha_creacion": "2026-10-17T05:02:11.412980Z",
+    "question_count": 0
 }
 
 El título y el resto de campos se conservan.  -> Código de estado: 200 OK
 
-
 ==============================================================================
 5) ELIMINAR — DELETE desde el detalle
 ------------------------------------------------------------------------------
-DELETE /api/examenes/11/
+DELETE /api/examenes/8/
 HTTP 204 No Content
 Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
 
 -> Código de estado: 204 No Content
 
+==============================================================================
+6) UN ROL QUE NO PUEDE BORRAR — DELETE con el token del AGENTE
+------------------------------------------------------------------------------
+DELETE /api/preguntas/12/      (cabecera: Authorization: Token <token agente>)
+HTTP 403 Forbidden
+Content-Type: application/json
+
+{"detail":"You do not have permission to perform this action."}
+
+La pregunta sigue existiendo. -> Código de estado: 403 Forbidden
 
 ==============================================================================
 RESUMEN DE CÓDIGOS (API navegable)
 ------------------------------------------------------------------------------
-Listar          GET     /api/examenes/        -> 200 OK
-Detalle         GET     /api/examenes/11/     -> 200 OK
-Crear           POST    /api/examenes/        -> 201 Created
-Modificar par.  PATCH   /api/examenes/11/     -> 200 OK
-Eliminar        DELETE  /api/examenes/11/     -> 204 No Content
+Sin identidad              GET     /api/examenes/        -> 401 Unauthorized
+Login (profe)              POST    /api-auth/login/     -> 200 OK
+Listar                     GET     /api/examenes/       -> 200 OK
+Detalle                    GET     /api/examenes/8/     -> 200 OK
+Crear                      POST    /api/examenes/       -> 201 Created
+Modificar par.             PATCH   /api/examenes/8/     -> 200 OK
+Eliminar                   DELETE  /api/examenes/8/     -> 204 No Content
+Agente intenta borrar      DELETE  /api/preguntas/12/   -> 403 Forbidden
 ==============================================================================
